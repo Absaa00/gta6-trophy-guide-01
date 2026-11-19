@@ -1,48 +1,48 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Leonida Trophy Guide — GTA VI · 55 PS5 Trophies</title>
-<meta name="description" content="Offline guide and tracker for all 55 PlayStation 5 trophies of Grand Theft Auto VI: checklist, roadmap to the Platinum, missable flags, and a cited guide for every trophy.">
+<title>Leonida Ledger — GTA VI Trophy Guide &amp; Tracker</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23f2b13c'/%3E%3Ctext x='8' y='12' font-size='11' text-anchor='middle' fill='%230d1320' font-family='Georgia' font-weight='bold'%3EL%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header id="top">
-  <div class="brand">
-    <div class="mark" aria-hidden="true">L<span>VI</span></div>
-    <div>
-      <h1>Leonida Trophy Guide</h1>
-      <p class="sub">Grand Theft Auto VI · PlayStation 5 · 55 trophies — 1 Platinum · 2 Gold · 6 Silver · 46 Bronze · 28 hidden · 0 online</p>
-    </div>
+<header class="masthead">
+  <h1>Leonida <em>Ledger</em></h1>
+  <p class="tagline">An offline guide and tracker for all 55 PlayStation 5 trophies of Grand Theft Auto VI —
+    official names, descriptions and grades, a checklist that saves in your browser, a road to the
+    platinum, and a guide to each trophy in this guide's own words, with its sources named.
+    No network needed; nothing leaves your browser.</p>
+  <div class="progress-line">
+    <span class="big-count" id="bigCount">0 <small>/ 55 earned</small></span>
+    <span class="grade-tally" id="gradeTally"></span>
   </div>
-  <div class="progress" id="progressBox" role="status" aria-label="Overall progress">
-    <div class="progress-text"><strong id="earnedCount">0 / 55</strong><span id="progressPct">0% to Platinum</span></div>
-    <div class="bar"><div class="fill" id="progressFill" style="width:0%"></div></div>
-    <div class="grade-counts" id="gradeCounts"></div>
-  </div>
+  <div class="bar" aria-hidden="true"><i id="progressBar" style="width:0%"></i></div>
+  <div class="bar-label" id="progressLabel">Platinum progress</div>
 </header>
 
-<nav id="tabs" aria-label="Sections">
-  <button class="tab active" data-tab="checklist" type="button">Checklist</button>
-  <button class="tab" data-tab="roadmap" type="button">Roadmap to Platinum</button>
-  <button class="tab" data-tab="missables" type="button">Missables <span class="pill" id="missablePill">1</span></button>
-  <button class="tab" data-tab="save" type="button">Save &amp; Data</button>
-  <span class="nextup" id="nextUp"></span>
+<nav class="tabs" role="tablist" aria-label="Guide sections">
+  <button type="button" role="tab" id="tab-checklist" aria-selected="true" data-tab="checklist">Checklist <span class="n" id="tabCountChecklist"></span></button>
+  <button type="button" role="tab" id="tab-roadmap" aria-selected="false" data-tab="roadmap">Roadmap to Platinum <span class="n">7 stages</span></button>
+  <button type="button" role="tab" id="tab-missables" aria-selected="false" data-tab="missables">Missables <span class="n">1 flagged</span></button>
+  <button type="button" role="tab" id="tab-planner" aria-selected="false" data-tab="planner">Next up <span class="n" id="tabCountPlanner"></span></button>
 </nav>
 
-<section id="controls" aria-label="Filters">
-  <input id="search" type="search" placeholder="Search a trophy by name or description…" autocomplete="off" aria-label="Search trophies">
-  <div class="chips" id="kindChips" role="group" aria-label="Filter by kind">
-    <button class="chip active" data-kind="all" type="button">All</button>
-    <button class="chip" data-kind="story" type="button">Story</button>
-    <button class="chip" data-kind="missable" type="button">Missable</button>
-    <button class="chip" data-kind="collectibles" type="button">Collectibles</button>
-    <button class="chip" data-kind="activities" type="button">Activities</button>
-    <button class="chip" data-kind="online" type="button">Online</button>
-  </div>
-  <label class="ctl">Grade
-    <select id="gradeFilter" aria-label="Filter by grade">
+<div class="toolbar" id="toolbar">
+  <label>Search <input type="search" id="search" placeholder="Trophy, mission or word…" autocomplete="off"></label>
+  <label>Kind
+    <select id="kindFilter">
+      <option value="all">All kinds</option>
+      <option value="story">Story</option>
+      <option value="missable">Missable</option>
+      <option value="collectibles">Collectibles</option>
+      <option value="activities">Activities</option>
+      <option value="online">Online</option>
+    </select>
+  </label>
+  <label>Grade
+    <select id="gradeFilter">
       <option value="all">All grades</option>
       <option value="platinum">Platinum</option>
       <option value="gold">Gold</option>
@@ -50,74 +50,80 @@
       <option value="bronze">Bronze</option>
     </select>
   </label>
-  <label class="ctl">Show
-    <select id="statusFilter" aria-label="Filter by earned state">
-      <option value="all">All trophies</option>
-      <option value="earned">Earned only</option>
+  <label>Status
+    <select id="statusFilter">
+      <option value="all">Earned + remaining</option>
       <option value="remaining">Remaining only</option>
+      <option value="earned">Earned only</option>
     </select>
   </label>
-  <label class="spoiler" title="Hides the names and descriptions of story trophies until they are earned">
-    <input id="spoilerToggle" type="checkbox"> Spoiler-safe: hide story trophies
-  </label>
-</section>
+  <label class="check"><input type="checkbox" id="spoilerToggle" checked> Hide story spoilers</label>
+  <span class="spacer"></span>
+  <button type="button" class="btn" id="exportBtn">Export progress</button>
+  <label class="btn ghost import-label">Import progress<input type="file" id="importFile" accept="application/json,.json"></label>
+  <button type="button" class="btn danger" id="resetBtn">Reset all</button>
+</div>
 
 <main>
-  <section id="view-checklist" class="view active" aria-label="Trophy checklist">
-    <div class="list-wrap">
-      <p class="list-meta" id="listMeta"></p>
-      <ul id="trophyList" class="trophy-list"></ul>
-      <p class="empty" id="emptyState" hidden>No trophies match these filters. Try clearing the search or choosing another kind.</p>
+  <section class="view active" id="view-checklist" role="tabpanel" aria-labelledby="tab-checklist">
+    <div class="checklist-grid">
+      <div>
+        <p class="result-note" id="resultNote"></p>
+        <ul class="trophy-list" id="trophyList"></ul>
+      </div>
+      <aside class="detail" id="detailPane" aria-live="polite"></aside>
     </div>
-    <aside id="detail" class="detail" aria-label="Trophy guide" aria-live="polite"></aside>
   </section>
 
-  <section id="view-roadmap" class="view" aria-label="Roadmap to the Platinum">
-    <p class="intro">One playthrough is enough, says PowerPyx — no difficulty settings, no mission gold medals, no replay needed. About 200 hours at a 4/10 difficulty. Work the stages in order; the only thing that cannot wait is Stage 1.</p>
-    <ol id="roadmapList" class="roadmap"></ol>
-    <p class="fine">Roadmap built from the official descriptions. Difficulty, time and playthrough figures: PowerPyx, GTA 6 Trophy Guide &amp; Roadmap.</p>
+  <section class="view" id="view-roadmap" role="tabpanel" aria-labelledby="tab-roadmap">
+    <p class="result-note">The road to the platinum in seven stages, in the order to play them. Every one of the
+      55 trophies sits in exactly one stage. Stage 1 holds the only trophy that can be missed — do it
+      before Chapter 1 ends.</p>
+    <div id="roadmapStages"></div>
   </section>
 
-  <section id="view-missables" class="view" aria-label="Missable trophies">
-    <div class="missable-hero" id="missableHero"></div>
-    <h2>Every other trophy: safe</h2>
-    <p class="intro">PowerPyx flags only one trophy as potentially missable. The other 54 are either automatic story trophies, repeatable activities, or collectibles that stay available after the story. Keep cheats off — PowerPyx reports that turning on a cheat disables trophies.</p>
-    <ul id="safeList" class="safe-list"></ul>
-    <p class="fine">Missable verdict: PowerPyx (18 Nov 2026). Five trophies whose exact triggers are not yet pinned down are marked “not yet known” in their guides, not missable.</p>
+  <section class="view" id="view-missables" role="tabpanel" aria-labelledby="tab-missables">
+    <div class="miss-callout" id="missCallout"></div>
+    <h2 style="font-family:Georgia,serif">The other 54 are safe — why</h2>
+    <p class="result-note">Each trophy below, with the reason it cannot be missed. Built from the official
+      descriptions and the launch guides (PowerPyx, GTABase), 18–19 Nov 2026.</p>
+    <table class="safe-table">
+      <thead><tr><th>Trophy</th><th>Grade</th><th>Why it is safe</th></tr></thead>
+      <tbody id="safeRows"></tbody>
+    </table>
   </section>
 
-  <section id="view-save" class="view" aria-label="Save and data">
-    <h2>Your progress lives in this browser</h2>
-    <p class="intro">Earned marks, counters and notes are saved to localStorage on this device as you work — nothing leaves the browser. Export a backup file before clearing browser data, and import it back here.</p>
-    <div class="save-grid">
-      <div class="save-card">
-        <h3>Export</h3>
-        <p>Download a JSON backup of your checklist, counters and notes.</p>
-        <button id="exportBtn" type="button">Export progress (.json)</button>
-      </div>
-      <div class="save-card">
-        <h3>Import</h3>
-        <p>Restore a backup exported from this guide. Importing replaces the current progress.</p>
-        <input id="importFile" type="file" accept=".json,application/json">
-        <p class="fine" id="importStatus"></p>
-      </div>
-      <div class="save-card danger">
-        <h3>Reset</h3>
-        <p>Clear every earned mark, counter and note stored in this browser.</p>
-        <button id="resetBtn" type="button">Reset all progress</button>
-      </div>
-    </div>
-    <h2>Sources</h2>
-    <ul id="sourceList" class="source-list"></ul>
-    <p class="fine">Trophy names, descriptions and grades are the official PlayStation list as published by Exophase and PSNProfiles. Guides are written in our own words for this guide and cite their sources beside each trophy; where a location or step is not yet pinned down in the published guides, the guide says so plainly instead of guessing.</p>
+  <section class="view" id="view-planner" role="tabpanel" aria-labelledby="tab-planner">
+    <p class="result-note planner-note">Your next five trophies, in roadmap order — earliest stage first, story
+      before cleanup. Earn one and the list moves on. Counters below are the running totals you keep on
+      each trophy's card.</p>
+    <div id="plannerList"></div>
   </section>
 </main>
 
-<footer id="about">
-  <p><strong>Leonida Trophy Guide</strong> — an unofficial fan-made tracker. Not affiliated with Rockstar Games, Take-Two Interactive, Sony Interactive Entertainment, Exophase, PSNProfiles or PowerPyx. No Rockstar logo or official artwork is used anywhere in this guide.</p>
-  <p class="fine">Works fully offline: every file it loads is part of this app, and it makes no network request while it runs. Source links above open only when you follow them.</p>
+<footer>
+  <h2>Sources</h2>
+  <ul>
+    <li>Official trophy names, descriptions and grades: the official list as Exophase lists it —
+      <a href="https://www.exophase.com/game/grand-theft-auto-vi-psn/trophies/">exophase.com/game/grand-theft-auto-vi-psn/trophies</a></li>
+    <li>PSN progress counts (42 Shooting Range challenges, 14 drone-race locations, 52 areas, 9 gangs,
+      8 garages, 500 choices): <a href="https://psnprofiles.com/trophies/43531-grand-theft-auto-vi">psnprofiles.com/trophies/43531-grand-theft-auto-vi</a></li>
+    <li>Roadmap, the one possibly missable trophy, and the launch facts (about 200 hours, difficulty 4/10,
+      no mission replay, cheats disable trophies): PowerPyx —
+      <a href="https://www.powerpyx.com/gta-6-grand-theft-auto-vi-trophy-guide-roadmap/">powerpyx.com — GTA 6 trophy guide &amp; roadmap</a></li>
+    <li>Missable flag corroborated by GTABase. Further community guides worth checking as the game is
+      mapped: GTA Zone and Planet GTA 6.</li>
+  </ul>
+  <h2>Honesty note</h2>
+  <p>Grand Theft Auto VI released 19 November 2026; this guide was written 19 November 2026, the day
+    after the public guides first appeared. Where a location or a step had not been pinned down in
+    public guides, the trophy's card says so plainly instead of guessing. Check the linked sources
+    before you chase an unverified trophy — the community is still mapping Leonida.</p>
+  <p>Unofficial fan guide. Not affiliated with Rockstar Games or PlayStation. No Rockstar logo or
+    official artwork is used anywhere in this guide. Your progress, counters and notes are stored only
+    in this browser (localStorage); export and import move them as a file you own.</p>
 </footer>
 
-<script src="app.js"></script>
+<script type="module" src="app.js"></script>
 </body>
 </html>

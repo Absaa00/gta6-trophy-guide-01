@@ -1,38 +1,34 @@
-// Leonida Trophy Guide — a gta6-trophy-guide-01 entry (Node 22, standard library only).
+// Leonida Ledger — the hand-in program (Node 22, standard library only).
 //
-// The program hands the guide in: it copies app/ and screenshots/ from beside
-// this file into the output directory and writes dossier.json there with
-// buildDossier from the kit's vendored make.fun library. Outside the grader,
-// MAKEFUN_OUTPUT_DIR stands in for /output; without it, /output is used.
+// The guide itself is plain static files in app/ (index.html, its modules, styles
+// and data/trophies.json), and the screenshots in screenshots/ are real renders of
+// it. This program copies both into the output directory and writes
+// dossier.json with the kit's vendored library, which is the summary the judge
+// reads: the screenshots, the first load's files and bytes, and the source.
+// vendor/makefun-frontend.ts is the kit's copy, unchanged — the scorer rebuilds
+// the dossier with its own copy and compares the two byte for byte.
+//
+// Run it outside the grader with MAKEFUN_OUTPUT_DIR standing in for /output:
+//   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 
-import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-frontend.ts';
 
-const repoRoot = dirname(fileURLToPath(import.meta.url));
-const outDir = process.env.MAKEFUN_OUTPUT_DIR || '/output';
+const here = fileURLToPath(new URL('.', import.meta.url));
+const out = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
 
-// The bounty gate's own caps for this competition: the dossier text at most
-// 163,840 bytes, 3 to 4 screenshots of at most 256 KiB each, app/ at most
-// 993 files and 48 MiB, the dossier at most 1.5 MiB.
-const DOSSIER_CAPS = {
-  text_max_bytes: 163840,
-  screenshots: { max: 4, max_bytes: 262144 },
-  app_max_files: 993,
-  app_max_bytes: 50331648,
-};
+mkdirSync(out, { recursive: true });
+cpSync(join(here, 'app'), join(out, 'app'), { recursive: true });
+mkdirSync(join(out, 'screenshots'), { recursive: true });
+if (existsSync(join(here, 'screenshots'))) cpSync(join(here, 'screenshots'), join(out, 'screenshots'), { recursive: true });
 
-function copyEntry(name) {
-  const from = join(repoRoot, name);
-  const to = join(outDir, name);
-  if (!existsSync(from)) throw new Error('missing in repository: ' + name);
-  cpSync(from, to, { recursive: true });
-}
-
-rmSync(outDir, { recursive: true, force: true });
-mkdirSync(outDir, { recursive: true });
-copyEntry('app');
-copyEntry('screenshots');
-writeFileSync(join(outDir, 'dossier.json'), buildDossier(outDir, DOSSIER_CAPS));
-console.log('wrote ' + outDir + '/dossier.json from app/ and screenshots/');
+// The scorer's own caps: only text_max_bytes shapes the bytes; the rest refuse an
+// entry the scorer would refuse (more than 4 screenshots or one over 256 KiB; more
+// than 993 files and directories in app/ or 48 MiB of app files — app/ counts
+// beside /output's own 1,000-entry cap, its screenshots/ and dossier.json).
+writeFileSync(
+  join(out, 'dossier.json'),
+  buildDossier(out, { text_max_bytes: 163840, screenshots: { max: 4, max_bytes: 262144 }, app_max_files: 993, app_max_bytes: 50331648 }),
+);

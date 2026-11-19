@@ -1,41 +1,55 @@
-# gta6-trophy-guide-01
+# Leonida Ledger — GTA VI Trophy Guide & Tracker
 
-[![make.fun · gta6-trophy-guide-01](https://make.fun/badge/gta6-trophy-guide-01.svg)](https://make.fun/bounty/gta6-trophy-guide-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-trophy-guide-01)
-[![rank](https://make.fun/badge/gta6-trophy-guide-01/Absaa00/gta6-trophy-guide-01/rank.svg)](https://make.fun/bounty/gta6-trophy-guide-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=gta6-trophy-guide-01)
-[![reward](https://make.fun/badge/gta6-trophy-guide-01/Absaa00/gta6-trophy-guide-01/reward.svg)](https://make.fun/bounty/gta6-trophy-guide-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-trophy-guide-01)
+[![make.fun bounty](https://img.shields.io/badge/make.fun-bounty-orange)](https://make.fun/bounty/gta6-trophy-guide-01)
 
-**Leonida Trophy Guide** — an offline guide and tracker for all 55 PlayStation 5 trophies of Grand Theft Auto VI: every trophy with its official name, description and grade, a checklist saved in the browser, export and import, filters by kind, a spoiler setting that hides story trophies until they are earned, a staged roadmap to the Platinum, the one missable trophy flagged, and a guide to each trophy in our own words that cites its sources. Built for the [make.fun bounty](https://make.fun/bounty/gta6-trophy-guide-01).
+An offline guide and tracker for all 55 PlayStation 5 trophies of Grand Theft Auto VI,
+built for the [make.fun bounty](https://make.fun/bounty/gta6-trophy-guide-01).
 
-## What it does
+## What it is
 
-- **All 55 official trophies** — 1 Platinum, 2 Gold, 6 Silver, 46 Bronze (28 hidden on PSN, 0 online), with exact official names, descriptions and grades from the list Exophase and PSNProfiles publish.
-- **Checklist tracker** — tick trophies off as you earn them; progress is saved in localStorage and shown as a bar plus per-grade counts.
-- **Progress counters** — steppers for the counted trophies (250 stunts, 42 shooting-range golds, 100 WAiNK locations, $250,000 laundered, …) and a personal note per trophy.
-- **Filters** — by kind (Story, Missable, Collectibles, Activities, Online), by grade, by earned/remaining, plus text search.
-- **Spoiler-safe mode** — hides the names and descriptions of story trophies until they are earned.
-- **Roadmap to the Platinum** — seven stages in order, from the Chapter 1 missable (meditate at Jason's house first!) to the 100% checklist and the Platinum, with per-stage progress.
-- **Missables page** — the one trophy PowerPyx flags as potentially missable (Positive Mental Attitude), with why, and every other trophy listed as safe with its reason.
-- **Cited guides** — each trophy's guide names its sources beside it (Exophase, PSNProfiles, PowerPyx, GTA Zone, Planet GTA 6). Where a location or step is not yet pinned down in the published guides, the guide says so plainly instead of guessing.
-- **Export / import** — download a JSON backup of your progress and restore it later.
+- **Checklist** of all 55 official trophies — name, description and grade exactly as
+  PlayStation publishes them (1 platinum, 2 gold, 6 silver, 46 bronze) — with progress
+  saved in the browser, export to a file and import back.
+- **Filters** by kind (story, missable, collectibles, activities), grade, earned/remaining,
+  plus search — and a **spoiler setting** that hides the names and descriptions of story
+  trophies until they are earned.
+- **Roadmap to the Platinum** in 7 stages, in the order to play them; every trophy sits
+  in exactly one stage.
+- **Missables page**: the one possibly missable trophy (Positive Mental Attitude — see its
+  card for the Chapter 1 warning) plus the other 54, each with the reason it is safe.
+- **Next up planner**: your next five trophies in roadmap order, with a reason each.
+- **A guide to every trophy** in this guide's own words, naming its sources (Exophase for
+  the official list, PSNProfiles for PSN's counts, PowerPyx and GTABase for the roadmap and
+  the missable flag). Where a location or step had not been pinned down in public guides by
+  19 Nov 2026, the card says so plainly instead of guessing.
+- **Progress counters** for every trophy with a target (250 stunts, 42 shooting-range golds,
+  100 WAiNK spots, $250,000 laundered…) and a **personal note** per trophy.
+- **Fully offline**: static files under `app/`, no network request at run time. No Rockstar
+  logo or official artwork anywhere — the look is this guide's own.
 
-All artwork and lettering is original. No Rockstar logo or official artwork is used.
-
-## Run it
+## Try it
 
 ```sh
-node serve.ts
-# open http://localhost:8080
+node serve.ts        # app/ on http://localhost:8080
 ```
 
-No build step, no network, no dependencies — plain static files under `app/`. The app makes no network request while it runs; source links open only when you follow them.
-
-## Hand in
+## Hand it in
 
 ```sh
 mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
-node ../gta6-trophy-guide-01-kit27/gta6-trophy-guide-01-kit/cli/makefun.mjs check --kit ../gta6-trophy-guide-01-kit27/gta6-trophy-guide-01-kit --repo .
 ```
 
----
+`main.ts` (Node 22, standard library only) copies `app/` and `screenshots/` to the output
+directory and writes `dossier.json` with the kit's vendored `vendor/makefun-frontend.ts`.
 
-<sub>Entered on [make.fun](https://make.fun/?utm_source=github&utm_medium=readme&utm_campaign=gta6-trophy-guide-01) · AI agents build software for cash rewards</sub>
+## Screenshots
+
+```sh
+node shots.mjs       # 4 real renders of the guide in headless Chromium
+node verify.mjs      # drives every feature + rebuilds the dossier twice
+```
+
+## License
+
+MIT — see [LICENSE](LICENSE). Unofficial fan guide, not affiliated with Rockstar Games
+or PlayStation.
