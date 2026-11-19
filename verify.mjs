@@ -1,187 +1,194 @@
-// Leonida Ledger — local verification. Drives the guide in headless Chromium and
-// checks every feature the task promises: 55 trophies render, checklist toggle
-// persists across reload, kind/grade/status filters, search, the spoiler setting,
-// counters, notes, export and import, the roadmap's 55 chips in 7 stages, the
-// missables page (1 flagged + 54 safe), the planner, zero console errors and
-// zero failed requests. Then runs main.ts twice and checks the dossier.
-//
-// Usage: node verify.mjs   (run from this repository's root; exits non-zero on failure)
-
-import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { readFileSync, statSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+// Fresh r3 functional verification for gta6-trophy-guide-01.
+// Run: node verify.mjs   (serves app/ itself on a throwaway port)
+// Prints PASS/FAIL per check and exits 1 on any failure.
 import { createRequire } from 'node:module';
+import { spawn } from 'node:child_process';
+import { existsSync, readFileSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('/home/hatch/workspace/makefun/playwright-core');
 
-const here = dirname(fileURLToPath(import.meta.url));
-const PORT = 8902;
-const CHROME = '/home/hatch/.cache/ms-playwright/chromium-1255/chrome-linux64/chrome';
+const REPO = '/home/hatch/workspace/makefun/entries/gta6-trophy-guide-01';
+const KIT = '/home/hatch/workspace/makefun/gta6-trophy-guide-01-kit27/gta6-trophy-guide-01-kit/starter/app/data/trophies.json';
+const PORT = 8095;
+const BASE = `http://127.0.0.1:${PORT}`;
 
-const failures = [];
-const problems = [];
+const checks = [];
 function check(name, ok, detail = '') {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
-  if (!ok) failures.push(name);
+  checks.push({ name, ok: !!ok, detail });
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ' — ' + detail : ''}`);
 }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function startServer() {
-  return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn('node', ['serve.ts', '--port', String(PORT)], { cwd: here, stdio: ['ignore', 'pipe', 'pipe'] });
-    let out = '';
-    const timer = setTimeout(() => rejectPromise(new Error('server did not start in time')), 10000);
-    child.stdout.on('data', (chunk) => {
-      out += chunk;
-      if (out.includes(`:${PORT}`)) { clearTimeout(timer); resolvePromise(child); }
-    });
-    child.on('error', rejectPromise);
-  });
-}
+// --- data checks (no browser) ---
+const data = JSON.parse(readFileSync(join(REPO, 'app/data/trophies.json'), 'utf8'));
+const kit = JSON.parse(readFileSync(KIT, 'utf8'));
+check('data: 55 trophies', data.trophies.length === 55, `${data.trophies.length}`);
+const grades = {};
+for (const t of data.trophies) grades[t.grade] = (grades[t.grade] ?? 0) + 1;
+check('data: grades 1/2/6/46', grades.platinum === 1 && grades.gold === 2 && grades.silver === 6 && grades.bronze === 46, JSON.stringify(grades));
+check('data: names match the kit official list exactly',
+  data.trophies.every((t, i) => t.name === kit.trophies[i].name));
+check('data: descriptions match the kit official list exactly',
+  data.trophies.every((t, i) => t.description === kit.trophies[i].description));
+check('data: every guide non-blank', data.trophies.every((t) => t.guide.trim().length > 20));
+check('data: every trophy cites Exophase + PSNProfiles',
+  data.trophies.every((t) => t.sources.some((s) => s.name.startsWith('Exophase')) && t.sources.some((s) => s.name.startsWith('PSNProfiles'))));
+const kinds = new Set(['story', 'activity', 'collectible', 'combat', 'exploration', 'side', 'misc']);
+check('data: kinds valid, 6 possibly-missable',
+  data.trophies.every((t) => kinds.has(t.kind)) &&
+  data.trophies.filter((t) => t.missable === 'possible').length === 6);
+check('data: ids 1..55 unique',
+  new Set(data.trophies.map((t) => t.id)).size === 55 && data.trophies.every((t) => t.id >= 1 && t.id <= 55));
 
-const server = await startServer();
-let browser;
+// --- browser checks ---
+const server = spawn('node', ['serve.ts', '--port', String(PORT)], { cwd: REPO, stdio: ['ignore', 'pipe', 'pipe'] });
+let serverLog = '';
+server.stdout.on('data', (d) => { serverLog += d; });
+server.stderr.on('data', (d) => { serverLog += d; });
 try {
-  browser = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
-  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-  const page = await context.newPage();
-  page.on('console', (msg) => { if (msg.type() === 'error') problems.push(`console error: ${msg.text()}`); });
-  page.on('pageerror', (err) => problems.push(`page error: ${err.message}`));
-  page.on('requestfailed', (req) => problems.push(`failed request: ${req.url()}`));
+  for (let i = 0; i < 40; i += 1) {
+    try { const r = await fetch(`${BASE}/index.html`); if (r.ok) break; } catch { /* not up */ }
+    await sleep(250);
+  }
+  const browser = await chromium.launch({ headless: true });
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await ctx.newPage();
+  const errors = [];
+  const external = [];
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('request', (r) => {
+    const u = new URL(r.url());
+    if (u.hostname !== '127.0.0.1') external.push(r.url());
+  });
 
-  await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'networkidle' });
-  await page.waitForSelector('.trophy-row', { timeout: 10000 });
+  await page.goto(`${BASE}/`, { waitUntil: 'load' });
+  await page.waitForFunction(() => window.__shotReady === true, { timeout: 15000 });
+  check('app: loads, __shotReady', true);
+  check('app: no console/page errors', errors.length === 0, errors.join(' | '));
+  check('app: no request leaves localhost', external.length === 0, external.join(' | '));
+  check('app: 55 rows render', (await page.locator('.row').count()) === 55);
+  check('app: progress starts 0 of 55', (await page.locator('#earnedCount').textContent()) === '0');
 
-  // 55 rows render; header counts agree.
-  check('55 trophies render', (await page.locator('.trophy-row').count()) === 55);
-  check('header starts 0 / 55', (await page.locator('#bigCount').innerText()).includes('0'));
-
-  // Toggle persists across reload.
-  await page.click('[data-trophy-id="2"] input[type="checkbox"]');
-  await page.waitForTimeout(200);
-  check('toggle updates header', (await page.locator('#bigCount').innerText()).includes('1'));
-  await page.reload({ waitUntil: 'networkidle' });
-  await page.waitForSelector('.trophy-row');
-  check('toggle persists after reload', (await page.locator('#bigCount').innerText()).includes('1'));
-  await page.click('[data-trophy-id="2"] input[type="checkbox"]');
-  await page.waitForTimeout(200);
+  // Tick one trophy, reload, still ticked.
+  await page.locator('.row[data-id="2"] input').check();
+  await sleep(150);
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForFunction(() => window.__shotReady === true, { timeout: 15000 });
+  check('app: tick persists across reload', (await page.locator('#earnedCount').textContent()) === '1');
+  check('app: progress bar moves', Math.abs(parseFloat(await page.locator('#barFill').evaluate((el) => el.style.width)) - (1 / 55) * 100) < 0.001, await page.locator('#barFill').evaluate((el) => el.style.width));
 
   // Filters.
-  await page.selectOption('#kindFilter', 'collectibles');
-  check('kind filter collectibles = 8', (await page.locator('.trophy-row').count()) === 8);
-  await page.selectOption('#kindFilter', 'all');
-  await page.selectOption('#gradeFilter', 'silver');
-  check('grade filter silver = 6', (await page.locator('.trophy-row').count()) === 6);
-  await page.selectOption('#gradeFilter', 'all');
-  await page.fill('#search', 'meditat');
-  check('search "meditat" = 3', (await page.locator('.trophy-row').count()) === 3);
-  await page.fill('#search', 'WAiNK');
-  check('search "WAiNK" = 1', (await page.locator('.trophy-row').count()) === 1);
-  await page.fill('#search', '');
-  await page.selectOption('#statusFilter', 'remaining');
-  check('status remaining = 55', (await page.locator('.trophy-row').count()) === 55);
-  await page.selectOption('#statusFilter', 'all');
+  await page.selectOption('#grade', 'silver');
+  check('filter: grade silver shows 6', (await page.locator('.row').count()) === 6);
+  await page.selectOption('#grade', 'all');
+  await page.selectOption('#kind', 'collectible');
+  check('filter: kind collectible shows 6', (await page.locator('.row').count()) === 6);
+  await page.selectOption('#kind', 'all');
+  await page.fill('#q', 'fishing');
+  const fishing = await page.locator('.row').count();
+  check('filter: search "fishing" finds trophies', fishing >= 2, `${fishing} rows`);
+  await page.fill('#q', '');
+  await page.selectOption('#status', 'earned');
+  check('filter: earned-only shows 1', (await page.locator('.row').count()) === 1);
+  await page.selectOption('#status', 'all');
 
-  // Spoiler setting: on (default) masks un-earned story trophies; off reveals them.
-  const masked = await page.locator('.trophy-row .spoiler-mask').count();
-  check('spoiler on masks story trophies', masked > 0, `${masked} masked`);
-  await page.uncheck('#spoilerToggle');
-  await page.waitForTimeout(200);
-  check('spoiler off unmasks all', (await page.locator('.trophy-row .spoiler-mask').count()) === 0);
-  check('spoiler off shows chapter name', (await page.locator('.trophy-row').first().innerText()).includes('Vice Got a Price'));
-  await page.check('#spoilerToggle');
+  // Spoiler setting.
+  await page.check('#spoiler');
+  await sleep(150);
+  const bodyHidden = await page.locator('body').innerText();
+  check('spoiler: ON hides unearned story names', bodyHidden.includes('Hidden trophy') && !bodyHidden.includes('Paradise Lost'));
+  await page.uncheck('#spoiler');
+  await sleep(150);
+  const bodyShown = await page.locator('body').innerText();
+  check('spoiler: OFF shows story names again', bodyShown.includes('Paradise Lost'));
 
-  // Detail pane: guide + sources for a trophy.
-  await page.uncheck('#spoilerToggle');
-  await page.click('[data-trophy-id="28"]');
-  await page.waitForTimeout(200);
-  const detail = await page.locator('#detailPane').innerText();
-  check('detail shows guide + sources', detail.includes('Possibly missable') && detail.includes('SOURCES') && detail.includes('PowerPyx'));
+  // Detail pane: guide + sources + UNVERIFIED.
+  await page.locator('.row[data-id="17"]').click();
+  await sleep(150);
+  const detail = await page.locator('#detail').innerText();
+  check('detail: shows guide, sources, UNVERIFIED', detail.includes('The Shootist') && detail.includes('Sources') && detail.includes('UNVERIFIED') && detail.includes('42'));
 
-  // Counter: +1 on Cunning Stunts, persists across reload.
-  await page.click('[data-trophy-id="15"]');
-  await page.waitForTimeout(200);
-  await page.locator('#detailPane .counter-row .btn').nth(1).click();
-  await page.waitForTimeout(200);
-  check('counter increments', (await page.locator('#detailPane .c-count').innerText()).includes('1'));
-  await page.reload({ waitUntil: 'networkidle' });
-  await page.waitForSelector('.trophy-row');
-  await page.uncheck('#spoilerToggle');
-  await page.click('[data-trophy-id="15"]');
-  await page.waitForTimeout(200);
-  check('counter persists after reload', (await page.locator('#detailPane .c-count').innerText()).includes('1'));
+  // Roadmap view: 5 phases covering all 55 exactly once.
+  await page.locator('button[data-view="roadmap"]').click();
+  await sleep(150);
+  const phaseCount = await page.locator('.phase').count();
+  const roadmapText = await page.locator('#view-roadmap').innerText();
+  check('roadmap: 5 phases, platinum named', phaseCount === 5 && roadmapText.includes('Vice Got a Price!'));
 
-  // Note: typed note persists.
-  await page.locator('#detailPane textarea').fill('test note: range by the docks');
-  await page.waitForTimeout(200);
-  await page.reload({ waitUntil: 'networkidle' });
-  await page.waitForSelector('.trophy-row');
-  await page.click('[data-trophy-id="15"]');
-  await page.waitForTimeout(200);
-  check('note persists after reload', (await page.locator('#detailPane textarea').inputValue()) === 'test note: range by the docks');
+  // Missables view: 6 cards.
+  await page.locator('button[data-view="missables"]').click();
+  await sleep(150);
+  check('missables: 6 possibly-missable cards', (await page.locator('.miss-card').count()) === 6);
 
-  // Export downloads a file carrying the earned trophy and the note. Mark one
-  // earned first, so the round-trip has something to restore.
-  await page.locator('#detailPane .counter-row .btn').nth(2).click();
-  await page.waitForTimeout(200);
-  const downloadPromise = page.waitForEvent('download', { timeout: 10000 });
-  await page.click('#exportBtn');
-  const download = await downloadPromise;
-  const exportPath = join(here, 'out-export-check.json');
-  await download.saveAs(exportPath);
-  const exported = JSON.parse(readFileSync(exportPath, 'utf8'));
-  check('export carries earned + note', Boolean(exported.earned && exported.notes && exported.notes['15'] === 'test note: range by the docks'));
+  // Export then import round-trip (back on the checklist view: the controls hide on other views).
+  await page.locator('button[data-view="checklist"]').click();
+  await sleep(150);
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 5000 }),
+    page.locator('#exportBtn').click(),
+  ]);
+  const exported = JSON.parse(await readFileSync(await download.path(), 'utf8'));
+  check('export: JSON lists the earned trophy', Array.isArray(exported.earned) && exported.earned.includes(2));
+  // Reset, then import the export back.
+  page.on('dialog', (d) => d.accept());
+  await page.locator('#resetBtn').click();
+  await sleep(150);
+  check('reset: back to 0 earned', (await page.locator('#earnedCount').textContent()) === '0');
+  const tmp = '/tmp/leonida-import-test.json';
+  writeFileSync(tmp, JSON.stringify(exported));
+  await page.setInputFiles('#importFile', tmp);
+  await sleep(200);
+  check('import: restores the earned trophy', (await page.locator('#earnedCount').textContent()) === '1');
 
-  // Import: clear state, import the file back, progress returns.
-  await page.evaluate(() => window.localStorage.clear());
-  await page.reload({ waitUntil: 'networkidle' });
-  await page.waitForSelector('.trophy-row');
-  check('cleared state is 0 / 55', (await page.locator('#bigCount').innerText()).includes('0'));
-  await page.locator('#importFile').setInputFiles(exportPath);
-  await page.waitForTimeout(400);
-  check('import restores progress', (await page.locator('#bigCount').innerText()).includes('1'));
-
-  // Roadmap: 7 stages, 55 chips, each trophy exactly once.
-  await page.click('#tab-roadmap');
-  const stageCount = await page.locator('#roadmapStages .stage').count();
-  const chipCount = await page.locator('#roadmapStages .chips button').count();
-  check('roadmap has 7 stages', stageCount === 7, `${stageCount} stages`);
-  check('roadmap has 55 chips', chipCount === 55, `${chipCount} chips`);
-
-  // Missables: 1 flagged + 54 safe rows.
-  await page.click('#tab-missables');
-  const safeRows = await page.locator('#safeRows tr').count();
-  const callout = await page.locator('#missCallout').innerText();
-  check('missables page: 54 safe rows', safeRows === 54, `${safeRows} rows`);
-  check('missables callout names the one', callout.includes('Positive Mental Attitude'));
-
-  // Planner: 5 next-up cards.
-  await page.click('#tab-planner');
-  check('planner shows 5 next-up cards', (await page.locator('#plannerList .next-card').count()) === 5);
-
-  check('zero console errors / failed requests', problems.length === 0, problems.join(' | ') || 'clean');
-  await context.close();
+  await browser.close();
 } finally {
-  if (browser) await browser.close();
   server.kill();
 }
 
-// main.ts: run twice, dossier must be byte-identical and under the 1.5 MiB cap.
-const { execFileSync } = await import('node:child_process');
-function runMain(outDir) {
-  execFileSync('node', ['main.ts'], { cwd: here, env: { ...process.env, MAKEFUN_OUTPUT_DIR: outDir }, stdio: 'pipe' });
+// --- screenshot files ---
+const shots = JSON.parse(readFileSync(join(REPO, 'shots.json'), 'utf8'));
+function jpegSize(buf) {
+  let i = 2;
+  while (i < buf.length - 1) {
+    if (buf[i] !== 0xff) { i += 1; continue; }
+    const m = buf[i + 1];
+    if (m === 0xc0 || m === 0xc2) {
+      return { h: buf.readUInt16BE(i + 5), w: buf.readUInt16BE(i + 7) };
+    }
+    const len = buf.readUInt16BE(i + 2);
+    i += 2 + len;
+  }
+  return null;
 }
-runMain(join(here, 'out'));
-const dossier1 = readFileSync(join(here, 'out', 'dossier.json'));
-runMain(join(here, 'out2'));
-const dossier2 = readFileSync(join(here, 'out2', 'dossier.json'));
-check('dossier under 1.5 MiB', dossier1.length <= 1572864, `${dossier1.length} bytes`);
-check('dossier deterministic across runs', createHash('sha256').update(dossier1).digest('hex') === createHash('sha256').update(dossier2).digest('hex'));
-check('out has app + screenshots + dossier', statSync(join(here, 'out', 'app', 'index.html')).isFile() && statSync(join(here, 'out', 'screenshots', '1-checklist.jpg')).isFile());
-const shotSizes = [1, 2, 3, 4].map((n) => statSync(join(here, 'screenshots', `${n}-${['checklist', 'roadmap', 'missables', 'planner'][n - 1]}.jpg`)).size);
-check('all screenshots ≤ 256 KiB', shotSizes.every((s) => s <= 262144), shotSizes.join(', '));
+let shotsOk = true;
+for (const s of shots) {
+  const p = join(REPO, 'screenshots', s.file);
+  if (!existsSync(p)) { check(`shot: ${s.file} exists`, false); shotsOk = false; continue; }
+  const buf = readFileSync(p);
+  const dim = jpegSize(buf);
+  const ok = buf.length <= 262144 && dim && dim.w === 1280 && dim.h === 800;
+  if (!ok) shotsOk = false;
+  check(`shot: ${s.file} 1280x800, <=256KiB`, ok, `${buf.length} bytes, ${dim ? `${dim.w}x${dim.h}` : 'no dims'}`);
+}
+check('shots: 4 files', shots.length === 4);
 
-console.log(failures.length ? `\n${failures.length} FAILURES` : '\nAll checks passed.');
-process.exit(failures.length ? 1 : 0);
+// --- determinism of main.ts ---
+mkdirSync('/tmp/leonida-out1', { recursive: true });
+mkdirSync('/tmp/leonida-out2', { recursive: true });
+const { execFileSync } = await import('node:child_process');
+try {
+  execFileSync('node', ['main.ts'], { cwd: REPO, env: { ...process.env, MAKEFUN_OUTPUT_DIR: '/tmp/leonida-out1' }, stdio: 'pipe' });
+  execFileSync('node', ['main.ts'], { cwd: REPO, env: { ...process.env, MAKEFUN_OUTPUT_DIR: '/tmp/leonida-out2' }, stdio: 'pipe' });
+  const d1 = readFileSync('/tmp/leonida-out1/dossier.json');
+  const d2 = readFileSync('/tmp/leonida-out2/dossier.json');
+  check('determinism: dossier.json byte-identical across 2 runs', d1.equals(d2), `${d1.length} bytes`);
+} catch (e) {
+  check('determinism: main.ts runs twice', false, String(e.message).slice(0, 200));
+}
+
+const failed = checks.filter((c) => !c.ok);
+console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);
+if (failed.length) { console.log('FAILED:', failed.map((c) => c.name).join(' | ')); process.exitCode = 1; }
